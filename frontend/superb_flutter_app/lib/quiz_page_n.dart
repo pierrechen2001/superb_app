@@ -423,7 +423,7 @@ class _QuizPageState extends State<QuizPage> with SingleTickerProviderStateMixin
           title: Center(
             child: Text(
               '測驗結果',
-              style: _textStyle(color: secondaryColor, fontSize: 22, fontWeight: FontWeight.bold),
+              style: _textStyle(color: Colors.black, fontSize: 22, fontWeight: FontWeight.bold),
             ),
           ),
           content: Column(
@@ -442,13 +442,13 @@ class _QuizPageState extends State<QuizPage> with SingleTickerProviderStateMixin
               SizedBox(height: 8),
               Text(
                 '${correctAnswersCount}/${questions.length} 題答對',
-                style: _textStyle(color: secondaryColor, fontSize: 16),
+                style: _textStyle(color: Colors.black, fontSize: 16),
               ),
               SizedBox(height: 16),
               Text(
                 resultMessage,
                 textAlign: TextAlign.center,
-                style: _textStyle(color: Colors.white, fontSize: 16),
+                style: _textStyle(color: Colors.black, fontSize: 16),
               ),
             ],
           ),
@@ -744,6 +744,11 @@ class _QuizPageState extends State<QuizPage> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    // 在這裡檢查 selectedAnswer 是否為 null
+    if (selectedAnswer == null) {
+        print('尚未選擇任何答案。'); // 調試訊息
+    }
+
     // 底部按鈕邏輯
     Widget bottomButtons = isCalculatingResult 
       ? Center(
@@ -1039,7 +1044,11 @@ class _QuizPageState extends State<QuizPage> with SingleTickerProviderStateMixin
                                             color: optionColor,
                                             borderRadius: BorderRadius.circular(12),
                                             border: Border.all(
-                                              color: isSelected ? accentColor : Colors.transparent,
+                                              color: isCorrect != null
+                                                  ? (isCorrectOption 
+                                                      ? Color(0xFF4ADE80)  // Green for correct answer
+                                                      : (isSelected ? Color(0xFFF87171) : Colors.transparent))  // Red for selected wrong answer
+                                                  : (isSelected ? accentColor : Colors.transparent),  // Orange for selection before submission
                                               width: 2,
                                             ),
                                           ),
@@ -1091,18 +1100,36 @@ class _QuizPageState extends State<QuizPage> with SingleTickerProviderStateMixin
                     onPressed: isCorrect == null 
                       ? (selectedAnswer != null ? _confirmAnswer : null)  // 確認答案
                       : (currentQuestionIndex < questions.length - 1 ? _nextQuestion : _showResultDialog),  // 下一題或完成測驗
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isCorrect == null 
-                        ? (selectedAnswer != null ? accentColor : Colors.grey)  // 未選擇答案時為灰色
-                        : accentColor,  // 已確認答案時
-                      foregroundColor: isCorrect == null 
-                        ? (selectedAnswer != null ? Colors.white : Colors.grey[600])  // 未選擇答案時文字為深灰色
-                        : Colors.white,  // 已確認答案時
-                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    style: ButtonStyle(
+                      backgroundColor: MaterialStateProperty.resolveWith<Color>((Set<MaterialState> states) {
+                        if (states.contains(MaterialState.disabled)) {
+                          // 當按鈕被禁用時（未選擇答案）
+                          return Colors.grey[300]!;
+                        }
+                        // 當按鈕啟用時（已選擇答案）
+                        return accentColor;
+                      }),
+                      foregroundColor: MaterialStateProperty.resolveWith<Color>((Set<MaterialState> states) {
+                        if (states.contains(MaterialState.disabled)) {
+                          // 當按鈕被禁用時的文字顏色
+                          return Colors.black;
+                        }
+                        // 當按鈕啟用時的文字顏色
+                        return Colors.white;
+                      }),
+                      padding: MaterialStateProperty.all(
+                        EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       ),
-                      elevation: 0,
+                      shape: MaterialStateProperty.all(
+                        RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                      elevation: MaterialStateProperty.all(0),
                     ),
                     child: Text(
                       isCorrect == null 
