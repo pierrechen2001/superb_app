@@ -101,7 +101,7 @@ class _ChapterDetailPageState extends State<ChapterDetailPage> with SingleTicker
         return;
       }
       
-      print("正在獲取用戶星星數，用戶 ID: $userId");
+      print("正在獲取用戶星星數，用戶 ID: $userId, 科目: ${widget.subject}");
       final apiUrl = 'https://superb-backend-1041765261654.asia-east1.run.app/get_user_level_stars';
       // print("API URL: $apiUrl");
       
@@ -110,11 +110,9 @@ class _ChapterDetailPageState extends State<ChapterDetailPage> with SingleTicker
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'user_id': userId,
+          'subject': widget.subject,  // 添加科目參數
         }),
       );
-      
-      // print("API 響應狀態碼: ${response.statusCode}");
-      // print("API 響應內容: ${response.body}");
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -123,9 +121,6 @@ class _ChapterDetailPageState extends State<ChapterDetailPage> with SingleTicker
             // 將字符串鍵轉換為整數鍵
             Map<String, dynamic> stars = data['level_stars'];
             levelStars = stars.map((key, value) => MapEntry(key, value as int));
-            
-            // 輸出所有獲取到的星星數據
-            // print("獲取到的所有星星數據: $levelStars");
             
             // 計算總星星數
             totalStars = levelStars.values.fold(0, (sum, stars) => sum + stars);

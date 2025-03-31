@@ -1173,51 +1173,7 @@ async def update_knowledge_score(request: Request):
 @app.get("/get_knowledge_scores/{user_id}")
 async def get_knowledge_scores(user_id: str):
     try:
-        connection = get_db_connection()
-        connection.charset = 'utf8mb4'
-        
-        try:
-            with connection.cursor() as cursor:
-                # 設置連接的字符集
-                cursor.execute("SET NAMES utf8mb4")
-                cursor.execute("SET CHARACTER SET utf8mb4")
-                cursor.execute("SET character_set_connection=utf8mb4")
-                
-                # 獲取用戶的所有知識點分數
-                cursor.execute("""
-                SELECT 
-                    uks.knowledge_id,
-                    uks.score,
-                    kp.section_name,
-                    kp.point_name
-                FROM user_knowledge_score uks
-                JOIN knowledge_points kp ON uks.knowledge_id = kp.id
-                WHERE uks.user_id = %s
-                """, (user_id,))
-                
-                scores = cursor.fetchall()
-                
-                return {
-                    "success": True,
-                    "scores": scores
-                }
-        
-        finally:
-            connection.close()
-    
-    except Exception as e:
-        print(f"獲取知識點分數時出錯: {str(e)}")
-        import traceback
-        print(traceback.format_exc())
-        return {"success": False, "message": f"獲取知識點分數時出錯: {str(e)}"}
-
-@app.post("/get_user_level_stars")
-async def get_user_level_stars(request: Request):
-    try:
-        data = await request.json()
-        user_id = data.get('user_id')
-        
-        print(f"收到獲取用戶星星數請求: user_id={user_id}")
+        print(f"收到獲取用戶知識點分數請求: user_id={user_id}")
         
         if not user_id:
             print(f"錯誤: 缺少用戶 ID")
@@ -1233,37 +1189,266 @@ async def get_user_level_stars(request: Request):
                 cursor.execute("SET CHARACTER SET utf8mb4")
                 cursor.execute("SET character_set_connection=utf8mb4")
                 
-                # 獲取用戶在每個關卡的最高星星數
+                # 獲取用戶的知識點分數，包括知識點名稱和小節名稱
                 cursor.execute("""
-                SELECT level_id, MAX(stars) as stars
-                FROM user_level
-                WHERE user_id = %s
-                GROUP BY level_id
+                SELECT 
+                    uks.knowledge_id,
+                    uks.score,
+                    kp.point_name,
+                    kp.section_name,
+                    cl.subject
+                FROM 
+                    user_knowledge_score uks
+                JOIN 
+                    knowledge_points kp ON uks.knowledge_id = kp.id
+                JOIN 
+                    chapter_list cl ON kp.chapter_id = cl.id
+                WHERE 
+                    uks.user_id = %s
+                ORDER BY 
+                    uks.score DESC
                 """, (user_id,))
                 
-                results = cursor.fetchall()
-                
-                # 將結果轉換為字典格式
-                level_stars = {}
-                for row in results:
-                    level_stars[row['level_id']] = row['stars']
-                
-                print(f"找到用戶 {user_id} 的星星數記錄: {len(level_stars)} 個關卡")
+                scores = cursor.fetchall()
                 
                 return {
                     "success": True,
-                    "level_stars": level_stars
+                    "scores": scores
                 }
         
         finally:
             connection.close()
-            print(f"資料庫連接已關閉")
     
     except Exception as e:
-        print(f"獲取用戶星星數時出錯: {str(e)}")
+        print(f"獲取用戶知識點分數時出錯: {str(e)}")
         import traceback
         print(traceback.format_exc())
-        return {"success": False, "message": f"獲取用戶星星數時出錯: {str(e)}"}
+        return {"success": False, "message": f"獲取用戶知識點分數時出錯: {str(e)}"}
+
+@app.get("/get_weekly_stats/{user_id}")
+async def get_weekly_stats(user_id: str):
+    try:
+        print(f"收到獲取用戶每週學習統計請求: user_id={user_id}")
+        
+        if not user_id:
+            print(f"錯誤: 缺少用戶 ID")
+            return {"success": False, "message": "缺少用戶 ID"}
+        
+        connection = get_db_connection()
+        connection.charset = 'utf8mb4'
+        
+        try:
+            with connection.cursor() as cursor:
+                # 設置連接的字符集
+                cursor.execute("SET NAMES utf8mb4")
+                cursor.execute("SET CHARACTER SET utf8mb4")
+                cursor.execute("SET character_set_connection=utf8mb4")
+                
+                # 獲取當前日期
+                from datetime import datetime, timedelta
+                today = datetime.now().date()
+                
+                # 計算本週的開始日期（週一）
+                days_since_monday = today.weekday()
+                this_week_start = today - timedelta(days=days_since_monday)
+                
+                # 計算上週的開始和結束日期
+                last_week_start = this_week_start - timedelta(days=7)
+                last_week_end = this_week_start - timedelta(days=1)
+                
+                # 獲取本週每天的完成關卡數
+                this_week_stats = []
+                for i in range(7):
+                    day = this_week_start + timedelta(days=i)
+                    day_start = datetime.combine(day, datetime.min.time())
+                    day_end = datetime.combine(day, datetime.max.time())
+                    
+                    cursor.execute("""
+                    SELECT COUNT(*) as level_count
+                    FROM user_level
+                    WHERE user_id = %s AND answered_at BETWEEN %s AND %s
+                    """, (user_id, day_start, day_end))
+                    
+                    result = cursor.fetchone()
+                    level_count = result['level_count'] if result else 0
+                    
+                    this_week_stats.append({
+                        'day': ['週一', '週二', '週三', '週四', '週五', '週六', '週日'][i],
+                        'date': day.strftime('%Y-%m-%d'),
+                        'levels': level_count
+                    })
+                
+                # 獲取上週每天的完成關卡數
+                last_week_stats = []
+                for i in range(7):
+                    day = last_week_start + timedelta(days=i)
+                    day_start = datetime.combine(day, datetime.min.time())
+                    day_end = datetime.combine(day, datetime.max.time())
+                    
+                    cursor.execute("""
+                    SELECT COUNT(*) as level_count
+                    FROM user_level
+                    WHERE user_id = %s AND answered_at BETWEEN %s AND %s
+                    """, (user_id, day_start, day_end))
+                    
+                    result = cursor.fetchone()
+                    level_count = result['level_count'] if result else 0
+                    
+                    last_week_stats.append({
+                        'day': ['週一', '週二', '週三', '週四', '週五', '週六', '週日'][i],
+                        'date': day.strftime('%Y-%m-%d'),
+                        'levels': level_count
+                    })
+                
+                # 計算學習連續性（連續學習的天數）
+                cursor.execute("""
+                SELECT DISTINCT DATE(answered_at) as study_date
+                FROM user_level
+                WHERE user_id = %s
+                ORDER BY study_date DESC
+                LIMIT 30
+                """, (user_id,))
+                
+                study_dates = [row['study_date'] for row in cursor.fetchall()]
+                
+                streak = 0
+                if study_dates:
+                    # 檢查今天是否有學習
+                    if study_dates[0] == today:
+                        streak = 1
+                        # 檢查之前的連續天數
+                        for i in range(1, len(study_dates)):
+                            prev_date = study_dates[i-1]
+                            curr_date = study_dates[i]
+                            if (prev_date - curr_date).days == 1:
+                                streak += 1
+                            else:
+                                break
+                
+                return {
+                    "success": True,
+                    "weekly_stats": {
+                        "this_week": this_week_stats,
+                        "last_week": last_week_stats
+                    },
+                    "streak": streak
+                }
+        
+        finally:
+            connection.close()
+    
+    except Exception as e:
+        print(f"獲取用戶每週學習統計時出錯: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return {"success": False, "message": f"獲取用戶每週學習統計時出錯: {str(e)}"}
+
+@app.get("/get_learning_suggestions/{user_id}")
+async def get_learning_suggestions(user_id: str):
+    try:
+        print(f"收到獲取用戶學習建議請求: user_id={user_id}")
+        
+        if not user_id:
+            print(f"錯誤: 缺少用戶 ID")
+            return {"success": False, "message": "缺少用戶 ID"}
+        
+        connection = get_db_connection()
+        connection.charset = 'utf8mb4'
+        
+        try:
+            with connection.cursor() as cursor:
+                # 設置連接的字符集
+                cursor.execute("SET NAMES utf8mb4")
+                cursor.execute("SET CHARACTER SET utf8mb4")
+                cursor.execute("SET character_set_connection=utf8mb4")
+                
+                # 獲取弱點知識點（分數低於5分的）
+                cursor.execute("""
+                SELECT 
+                    uks.knowledge_id,
+                    uks.score,
+                    kp.point_name,
+                    kp.section_name,
+                    cl.subject,
+                    cl.chapter_name
+                FROM 
+                    user_knowledge_score uks
+                JOIN 
+                    knowledge_points kp ON uks.knowledge_id = kp.id
+                JOIN 
+                    chapter_list cl ON kp.chapter_id = cl.id
+                WHERE 
+                    uks.user_id = %s AND uks.score < 5
+                ORDER BY 
+                    uks.score ASC
+                LIMIT 10
+                """, (user_id,))
+                
+                weak_points = cursor.fetchall()
+                
+                # 獲取推薦的下一步學習章節
+                cursor.execute("""
+                SELECT 
+                    cl.id as chapter_id,
+                    cl.subject,
+                    cl.chapter_name,
+                    AVG(uks.score) as avg_score,
+                    COUNT(DISTINCT li.id) as total_levels,
+                    COUNT(DISTINCT ul.level_id) as completed_levels
+                FROM 
+                    chapter_list cl
+                JOIN 
+                    knowledge_points kp ON cl.id = kp.chapter_id
+                JOIN 
+                    user_knowledge_score uks ON kp.id = uks.knowledge_id
+                LEFT JOIN 
+                    level_info li ON cl.id = li.chapter_id
+                LEFT JOIN 
+                    user_level ul ON li.id = ul.level_id AND ul.user_id = %s
+                WHERE 
+                    uks.user_id = %s
+                GROUP BY 
+                    cl.id, cl.subject, cl.chapter_name
+                ORDER BY 
+                    avg_score ASC, (total_levels - completed_levels) DESC
+                LIMIT 5
+                """, (user_id, user_id))
+                
+                recommended_chapters = cursor.fetchall()
+                
+                # 生成學習建議
+                tips = [
+                    "每天保持固定的學習時間，建立學習習慣",
+                    "專注於弱點知識點，逐一攻克",
+                    "複習已完成的關卡，鞏固知識",
+                    "嘗試不同科目的學習，保持學習的多樣性",
+                    "設定每週學習目標，追蹤進度"
+                ]
+                
+                # 根據弱點知識點生成具體建議
+                if weak_points:
+                    subjects = set([wp['subject'] for wp in weak_points])
+                    for subject in subjects:
+                        subject_weak_points = [wp for wp in weak_points if wp['subject'] == subject]
+                        if subject_weak_points:
+                            point_names = [wp['point_name'] for wp in subject_weak_points[:3]]
+                            tips.append(f"加強{subject}科目中的{', '.join(point_names)}等知識點")
+                
+                return {
+                    "success": True,
+                    "weak_points": weak_points,
+                    "recommended_chapters": recommended_chapters,
+                    "tips": tips
+                }
+        
+        finally:
+            connection.close()
+    
+    except Exception as e:
+        print(f"獲取用戶學習建議時出錯: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return {"success": False, "message": f"獲取用戶學習建議時出錯: {str(e)}"}
 
 # 新增輔助函數：更新特定關卡相關的知識點分數
 async def _update_level_knowledge_scores(user_id: str, level_id: str, connection):
@@ -1459,10 +1644,6 @@ async def notify_daily_report():
                 WHERE last_attempted_at BETWEEN %s AND %s
                 """, (yesterday_start_str, yesterday_end_str))
                 
-                answer_stats = cursor.fetchone()
-                total_answers = answer_stats['total_answers'] if answer_stats else 0
-                answer_users = answer_stats['answer_users'] if answer_stats else 0
-                
                 # 獲取昨天活躍的前5名用戶
                 cursor.execute("""
                 SELECT user_id, COUNT(*) as level_count
@@ -1499,7 +1680,6 @@ async def notify_daily_report():
 
 【使用統計】
 昨日完成關卡數：{total_levels} 個
-昨日答題數量：{total_answers} 題
 昨日活躍用戶數：{total_users} 人
 """
 
@@ -1527,3 +1707,138 @@ async def notify_daily_report():
         import traceback
         print(traceback.format_exc())
         return {"status": "error", "message": f"發送每日報告時出錯: {str(e)}"}
+
+@app.post("/get_user_stats")
+async def get_user_stats(request: Request):
+    try:
+        data = await request.json()
+        user_id = data.get('user_id')
+        
+        print(f"收到獲取用戶統計數據請求: user_id={user_id}")
+        
+        if not user_id:
+            print(f"錯誤: 缺少用戶 ID")
+            return {"success": False, "message": "缺少用戶 ID"}
+        
+        connection = get_db_connection()
+        connection.charset = 'utf8mb4'
+        
+        try:
+            with connection.cursor() as cursor:
+                # 設置連接的字符集
+                cursor.execute("SET NAMES utf8mb4")
+                cursor.execute("SET CHARACTER SET utf8mb4")
+                cursor.execute("SET character_set_connection=utf8mb4")
+                
+                # 獲取今天的日期範圍
+                today = datetime.now().date()
+                today_start = datetime.combine(today, datetime.min.time())
+                today_end = datetime.combine(today, datetime.max.time())
+                
+                today_start_str = today_start.strftime('%Y-%m-%d %H:%M:%S')
+                today_end_str = today_end.strftime('%Y-%m-%d %H:%M:%S')
+                
+                # 1. 獲取今日完成的關卡數量
+                cursor.execute("""
+                SELECT COUNT(*) as today_levels
+                FROM user_level
+                WHERE user_id = %s AND answered_at BETWEEN %s AND %s
+                """, (user_id, today_start_str, today_end_str))
+                
+                today_result = cursor.fetchone()
+                today_levels = today_result['today_levels'] if today_result else 0
+                
+                # 2. 獲取今日各科目完成的關卡數量
+                cursor.execute("""
+                SELECT cl.subject, COUNT(*) as level_count
+                FROM user_level ul
+                JOIN level_info li ON ul.level_id = li.id
+                JOIN chapter_list cl ON li.chapter_id = cl.id
+                WHERE ul.user_id = %s AND ul.answered_at BETWEEN %s AND %s
+                GROUP BY cl.subject
+                """, (user_id, today_start_str, today_end_str))
+                
+                today_subject_levels = cursor.fetchall()
+                
+                # 3. 獲取各科目完成的關卡數量
+                cursor.execute("""
+                SELECT cl.subject, COUNT(*) as level_count
+                FROM user_level ul
+                JOIN level_info li ON ul.level_id = li.id
+                JOIN chapter_list cl ON li.chapter_id = cl.id
+                WHERE ul.user_id = %s
+                GROUP BY cl.subject
+                """, (user_id,))
+                
+                subject_levels = cursor.fetchall()
+                
+                # 4. 獲取總共完成的關卡數量
+                cursor.execute("""
+                SELECT COUNT(*) as total_levels
+                FROM user_level
+                WHERE user_id = %s
+                """, (user_id,))
+                
+                total_result = cursor.fetchone()
+                total_levels = total_result['total_levels'] if total_result else 0
+                
+                # 5. 獲取總體答對率
+                cursor.execute("""
+                SELECT 
+                    SUM(total_attempts) as total_attempts,
+                    SUM(correct_attempts) as correct_attempts
+                FROM user_question_stats
+                WHERE user_id = %s
+                """, (user_id,))
+                
+                accuracy_result = cursor.fetchone()
+                total_attempts = accuracy_result['total_attempts'] if accuracy_result and accuracy_result['total_attempts'] else 0
+                correct_attempts = accuracy_result['correct_attempts'] if accuracy_result and accuracy_result['correct_attempts'] else 0
+                
+                accuracy = 0
+                if total_attempts > 0:
+                    accuracy = (correct_attempts / total_attempts) * 100
+                
+                # 6. 獲取最近完成的關卡
+                cursor.execute("""
+                SELECT 
+                    ul.level_id, 
+                    ul.stars, 
+                    ul.answered_at,
+                    cl.subject,
+                    cl.chapter_name
+                FROM user_level ul
+                JOIN level_info li ON ul.level_id = li.id
+                JOIN chapter_list cl ON li.chapter_id = cl.id
+                WHERE ul.user_id = %s
+                ORDER BY ul.answered_at DESC
+                LIMIT 5
+                """, (user_id,))
+                
+                recent_levels = cursor.fetchall()
+                
+                # 格式化最近關卡的時間
+                for level in recent_levels:
+                    if 'answered_at' in level and level['answered_at']:
+                        level['answered_at'] = level['answered_at'].strftime('%Y-%m-%d %H:%M:%S')
+                
+                return {
+                    "success": True,
+                    "stats": {
+                        "today_levels": today_levels,
+                        "today_subject_levels": today_subject_levels,
+                        "subject_levels": subject_levels,
+                        "total_levels": total_levels,
+                        "accuracy": round(accuracy, 2),
+                        "recent_levels": recent_levels
+                    }
+                }
+        
+        finally:
+            connection.close()
+    
+    except Exception as e:
+        print(f"獲取用戶統計數據時出錯: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return {"success": False, "message": f"獲取用戶統計數據時出錯: {str(e)}"}

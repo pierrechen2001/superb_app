@@ -403,13 +403,13 @@ def generate_explanation_with_o3mini(question_data: Dict[str, Any]) -> str:
 4. {question_data['options'][3]}
 正確答案: {question_data['answer']}
 
-請提供一個簡短但清楚條列出題目重點的解釋，告訴這位同學為什麼這個答案是正確的，或其他選項為什麼不正確。
+請向同學提供一個簡短但清楚的解釋，說明這題的主要觀念或是解題關鍵！
 解釋應該有教育意義，幫助學生理解相關知識點，且中文字要是繁體中文，可以非常少量使用合適的 emoji 。
 """
 
         # 調用 o3-mini API
-        response = openai_client.chat.completions.create(
-            model="o3-mini",  # 改為使用 o3-mini
+        response = gemini_client.chat.completions.create(
+            model="gemini-2.0-flash",  # 改為使用 o3-mini
             messages=[{"role": "user", "content": prompt}],
         )
         
@@ -571,7 +571,7 @@ def process_question(connection, knowledge_id: int, question_data: Dict[str, Any
             question_data['answer'] = deepseek_answer
             
             # 生成解釋並保存題目
-            print(f"  [生成] 生成解釋")
+            print(f"  [生成] Gemini 生成解釋")
             explanation = generate_explanation_with_o3mini(question_data)
             print(f"  [保存] 保存修正後的題目到數據庫")
             save_question_to_database(connection, knowledge_id, question_data, explanation)

@@ -8,6 +8,8 @@ import 'dart:io';
 
 import 'dart:typed_data';// Flutter Web only
 
+import 'package:hive/hive.dart';
+
 class AddMistakePage extends StatefulWidget {
   final bool isEditMode;
   final Map<String, dynamic>? mistakeToEdit;
@@ -124,52 +126,23 @@ class _AddMistakePageState extends State<AddMistakePage> {
       _isLoading = true;
     });
 
+    String? base64Image; // 或者初始化為空字串 ''
+    // If we have a new image selected, upload it
+    if (_selectedImage != null) {
+      final bytes = await _selectedImage!.readAsBytes();
+      base64Image = base64Encode(bytes);
+    }
     try {
-      // If we have a new image selected, upload it
-      if (_selectedImage != null) {
-        try {
-          final bytes = await _selectedImage!.readAsBytes();
-          final base64Image = base64Encode(bytes);
-          
-          // Add the image to the request if available
-          Map<String, dynamic> imageUploadBody = {
-            "q_id": _mistakeId.isNotEmpty ? _mistakeId : "new",
-            "image_base64": base64Image,
-          };
-          
-          // Upload the image first if we have one
-          final imageResponse = await http.post(
-            Uri.parse("https://superb-backend-1041765261654.asia-east1.run.app/upload_image"),
-            headers: {"Content-Type": "application/json; charset=UTF-8"},
-            body: jsonEncode(imageUploadBody),
-          );
-          
-          if (imageResponse.statusCode != 200) {
-            print("Image upload error: ${imageResponse.body}");
-            throw Exception('圖片上傳失敗 (${imageResponse.statusCode})');
-          }
-        } catch (e) {
-          print("Image upload exception: $e");
-          // Continue with submission even if image upload fails
-          // But log the error and show a message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('圖片上傳失敗，但仍繼續提交表單'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-
       // Construct the request body for question data
       final Map<String, dynamic> requestBody = {
-        "summary": _questionController.text,
+        "summary": _response,
         "description": _questionController.text,
         "simple_answer": _selectedTag,
         "detailed_answer": _detailedAnswerController.text,
         "tag": _tagController.text,
         "subject": _selectedSubject,
         "difficulty": _selectedDifficulty,
+        "image_base64": base64Image,
       };
       
       // If in edit mode, include the ID
@@ -193,12 +166,34 @@ class _AddMistakePageState extends State<AddMistakePage> {
         throw Exception('伺服器錯誤: ${response.statusCode}');
       }
 
+      print("hi submitted response");
+      //print(response);
+
       final responseData = jsonDecode(utf8.decode(response.bodyBytes));
       setState(() {
-        _response = responseData["response"] ?? "No response";
+        _response = responseData["status"] ?? "No response";
         _isLoading = false;
       });
+      print(_response);
       
+      // 儲存錯題資訊到 Hive
+      var box = await Hive.openBox('questionsBox'); // 打開 Box
+      //requestBody['q_id']
+      await box.put("2", {
+        'summary': requestBody['summary'],
+        'subject': requestBody['subject'],
+        'chapter': '', // 如果有章節資訊，可以在這裡填寫
+        'description': requestBody['description'],
+        'difficulty': requestBody['difficulty'],
+        'simple_answer': requestBody['simple_answer'],
+        'detailed_answer': requestBody['detailed_answer'],
+        'tag': requestBody['tag'],
+        'timestamp': DateTime.now().toIso8601String(), // 當前時間作為時間戳
+        "image_base64": base64Image,
+      });
+
+      print("已儲存錯題資訊到 Hive");
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -254,7 +249,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
       // 構建請求體
       final Map<String, dynamic> requestBody = {
         "image_base64": base64Image,
-        "question": _questionController.text,
+        "user_message": _questionController.text,
       };
 
       final response = await http.post(

@@ -11,6 +11,7 @@ import 'chat_page_s.dart';
 import 'user_profile_page.dart';  // 引入新的用戶中心頁面
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/rendering.dart';
+import 'user_stats_page.dart';  // Import the UserStatsPage
 
 class HomePage extends StatefulWidget {
   @override
@@ -99,7 +100,13 @@ void _onItemTapped(int index) {
         },
       ),
     );
-  } else if (index == 2) {  // If "汪汪題" (Chat) is tapped
+  } else if (index == 1) {  // If (Stat) is tapped
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const UserStatsPage()),
+    );
+  }
+  else if (index == 2) {  // If "汪汪題" (Chat) is tapped
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => ChatPage()),

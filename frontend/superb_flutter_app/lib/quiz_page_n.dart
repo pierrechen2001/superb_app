@@ -44,7 +44,7 @@ class _QuizPageState extends State<QuizPage> with SingleTickerProviderStateMixin
 
   // 1. 更新顏色方案
   final Color primaryColor = Colors.white;
-  final Color secondaryColor = Colors.white; 
+  final Color secondaryColor = const Color.fromARGB(255, 255, 255, 255); 
   final Color accentColor = Color.fromARGB(255, 238, 159, 41);    // 橙色強調色，類似小島的顏色
   final Color cardColor = Colors.white;      // 白色卡片背景色
 
@@ -423,7 +423,7 @@ class _QuizPageState extends State<QuizPage> with SingleTickerProviderStateMixin
           title: Center(
             child: Text(
               '測驗結果',
-              style: _textStyle(color: Colors.black, fontSize: 22, fontWeight: FontWeight.bold),
+              style: _textStyle(color: const Color.fromARGB(255, 28, 49, 88), fontSize: 22, fontWeight: FontWeight.bold),
             ),
           ),
           content: Column(
@@ -442,13 +442,13 @@ class _QuizPageState extends State<QuizPage> with SingleTickerProviderStateMixin
               SizedBox(height: 8),
               Text(
                 '${correctAnswersCount}/${questions.length} 題答對',
-                style: _textStyle(color: Colors.black, fontSize: 16),
+                style: _textStyle(color: const Color.fromARGB(255, 28, 49, 88), fontSize: 16),
               ),
               SizedBox(height: 16),
               Text(
                 resultMessage,
                 textAlign: TextAlign.center,
-                style: _textStyle(color: Colors.black, fontSize: 16),
+                style: _textStyle(color: const Color.fromARGB(255, 19, 31, 54), fontSize: 16),
               ),
             ],
           ),
@@ -506,7 +506,7 @@ class _QuizPageState extends State<QuizPage> with SingleTickerProviderStateMixin
               SizedBox(width: 10),
               Text(
                 '回報題目錯誤',
-                style: _textStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                style: _textStyle(color: const Color.fromARGB(255, 28, 49, 88), fontWeight: FontWeight.bold, fontSize: 18),
               ),
             ],
           ),
@@ -518,7 +518,7 @@ class _QuizPageState extends State<QuizPage> with SingleTickerProviderStateMixin
               children: [
                 Text(
                   '請描述題目的錯誤之處：',
-                  style: _textStyle(color: Colors.white.withOpacity(0.9), fontSize: 15),
+                  style: _textStyle(color: const Color.fromARGB(255, 131, 141, 159), fontSize: 15),
                 ),
                 SizedBox(height: 16),
                 Container(
@@ -533,10 +533,10 @@ class _QuizPageState extends State<QuizPage> with SingleTickerProviderStateMixin
                   child: TextField(
                     controller: _errorController,
                     maxLines: 4,
-                    style: _textStyle(color: Colors.white, fontSize: 15),
+                    style: _textStyle(color: const Color.fromARGB(255, 28, 49, 88), fontSize: 15),
                     decoration: InputDecoration(
                       hintText: '例如：選項有誤、答案不正確、題目敘述不清...',
-                      hintStyle: _textStyle(color: secondaryColor, fontSize: 14),
+                      hintStyle: _textStyle(color: const Color.fromARGB(255, 113, 121, 137), fontSize: 14),
                       contentPadding: EdgeInsets.all(16),
                       border: InputBorder.none,
                     ),

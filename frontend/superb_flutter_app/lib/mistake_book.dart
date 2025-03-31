@@ -4,6 +4,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'add_mistake_page.dart';
 
+import 'package:hive/hive.dart';
+import 'dart:typed_data';
+
+
 class MistakeBookPage extends StatefulWidget {
   @override
   _MistakeBookPageState createState() => _MistakeBookPageState();
@@ -19,8 +23,44 @@ class _MistakeBookPageState extends State<MistakeBookPage> {
   void initState() {
     super.initState();
     _loadMistakes();
+    //_loadLocalMistakes();
   }
 
+  // Load added mistakes from Hive
+  Future<void> _reloadLocalMistakes() async {
+    try {
+      var box = await Hive.openBox('questionsBox'); // 打開 Hive Box
+      List<Map<String, dynamic>> localMistakes = [];
+
+      // 迭代 Hive 中的所有項目
+      box.toMap().forEach((key, value) {
+        localMistakes.add({
+          'q_id': key,
+          'summary': value['summary'],
+          'subject': value['subject'],
+          'chapter': value['chapter'],
+          'description': value['description'],
+          'difficulty': value['difficulty'],
+          'simple_answer': value['simple_answer'],
+          'detailed_answer': value['detailed_answer'],
+          'tag': value['tag'],
+          'timestamp': value['timestamp'],
+          "image_base64": value['image_base64'],
+        });
+      });
+
+      setState(() {
+        _mistakes = localMistakes; // 更新錯題列表
+        _filteredMistakes = _mistakes; // 初始顯示所有錯題
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading local mistakes: $e')),
+      );
+    }
+  }
+
+  // Load mistakes from cloud sql
   Future<void> _loadMistakes() async {
     try {
       final response = await http.get(Uri.parse('https://superb-backend-1041765261654.asia-east1.run.app/mistake_book'));
@@ -206,6 +246,9 @@ class _MistakeBookPageState extends State<MistakeBookPage> {
                     itemCount: _filteredMistakes.length,
                     itemBuilder: (context, index) {
                       final mistake = _filteredMistakes[_filteredMistakes.length - index - 1];
+                      final Uint8List? imageBytes = mistake['image_base64'] != null && mistake['image_base64'].isNotEmpty
+    ? base64Decode(mistake['image_base64'])
+    : null;
                       final currentDate = mistake['timestamp'].split('T')[0];
                       final nextDate = (index > 0)
                           ? _filteredMistakes[_filteredMistakes.length - index]['timestamp'].split('T')[0]
@@ -306,7 +349,21 @@ class _MistakeBookPageState extends State<MistakeBookPage> {
                                         ],
                                       ),
                                       SizedBox(height: 12),
-                                      // Image preview
+
+                                      // Check for image_base64 and display image if available
+                                      if (imageBytes != null) ...[
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: Image.memory(
+                                            imageBytes,
+                                            height: 60,
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      ],
+
+                                      // Image preview (from cloud run)
                                       FutureBuilder(
                                         future: http.head(Uri.parse('https://superb-backend-1041765261654.asia-east1.run.app/static/${mistake['q_id']}.jpg')),
                                         builder: (context, snapshot) {
@@ -360,11 +417,15 @@ class _MistakeBookPageState extends State<MistakeBookPage> {
               ),
               child: FloatingActionButton(
                 heroTag: 'mistake_book_fab',
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  final result = await Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => AddMistakePage()),
                   );
+
+                  if (result == true) {
+                    _reloadLocalMistakes(); // 重新加載錯題
+                  }
                 },
                 backgroundColor: Color(0xFF1E3875),
                 foregroundColor: Colors.white,
@@ -448,7 +509,7 @@ class _MistakeDetailPageState extends State<MistakeDetailPage> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => AddMistakePage(
-                    isEditMode: true,
+                    isEditMode: true, //居然可以用這種方式傳遞參數
                     mistakeToEdit: widget.mistake,
                   ),
                 ),
@@ -457,6 +518,7 @@ class _MistakeDetailPageState extends State<MistakeDetailPage> {
               if (result == true) {
                 // Return to mistake book page with refresh signal
                 Navigator.pop(context, true);
+                //_loadLocalMistakes(); // 重新加載剛編輯的錯題
               }
             },
             child: Text(

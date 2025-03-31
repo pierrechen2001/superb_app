@@ -18,6 +18,11 @@ import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -31,6 +36,15 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // 初始化 Hive
+  await Hive.initFlutter();
+  await Hive.openBox('questionsBox');
+
+  final dir = await getApplicationDocumentsDirectory();
+  print("Hive 資料會儲存在這裡：${dir.path}");
+
+
   
   runApp(MyApp());
 }
